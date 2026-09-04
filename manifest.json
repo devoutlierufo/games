@@ -1,0 +1,154 @@
+{
+  "cat_idle_right": [
+    713,
+    824
+  ],
+  "cat_run_right_1": [
+    341,
+    464
+  ],
+  "cat_run_right_2": [
+    341,
+    464
+  ],
+  "cat_run_right_3": [
+    341,
+    464
+  ],
+  "cat_run_right_4": [
+    341,
+    464
+  ],
+  "cat_idle_left": [
+    713,
+    824
+  ],
+  "cat_run_left_1": [
+    341,
+    464
+  ],
+  "cat_run_left_2": [
+    341,
+    464
+  ],
+  "cat_run_left_3": [
+    341,
+    464
+  ],
+  "cat_run_left_4": [
+    341,
+    464
+  ],
+  "cat_idle_down": [
+    339,
+    458
+  ],
+  "cat_run_down_1": [
+    339,
+    458
+  ],
+  "cat_run_down_2": [
+    339,
+    458
+  ],
+  "cat_run_down_3": [
+    339,
+    458
+  ],
+  "cat_run_down_4": [
+    339,
+    458
+  ],
+  "cat_idle_up": [
+    339,
+    458
+  ],
+  "cat_run_up_1": [
+    339,
+    458
+  ],
+  "cat_run_up_2": [
+    339,
+    458
+  ],
+  "cat_run_up_3": [
+    339,
+    458
+  ],
+  "cat_run_up_4": [
+    339,
+    458
+  ],
+  "cat_pounce_right": [
+    424,
+    461
+  ],
+  "cat_carry_right": [
+    424,
+    461
+  ],
+  "cat_eat_right": [
+    424,
+    461
+  ],
+  "cat_happy_right": [
+    424,
+    461
+  ],
+  "cat_pounce_left": [
+    424,
+    461
+  ],
+  "cat_carry_left": [
+    424,
+    461
+  ],
+  "cat_eat_left": [
+    424,
+    461
+  ],
+  "cat_happy_left": [
+    424,
+    461
+  ],
+  "mouse_gray_1": [
+    366,
+    525
+  ],
+  "mouse_brown_1": [
+    366,
+    525
+  ],
+  "mouse_white_1": [
+    366,
+    525
+  ],
+  "mouse_gold_1": [
+    366,
+    525
+  ],
+  "mouse_gray_2": [
+    366,
+    525
+  ],
+  "mouse_brown_2": [
+    366,
+    525
+  ],
+  "mouse_white_2": [
+    366,
+    525
+  ],
+  "mouse_gold_2": [
+    366,
+    525
+  ],
+  "logo": [
+    2131,
+    692
+  ],
+  "living_room": [
+    1448,
+    1086
+  ]
+}
