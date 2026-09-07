@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Hurry up Pop Pop!</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#21130d;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;width:100%;height:100%;overflow:hidden}
+body{display:flex;justify-content:center;align-items:flex-start;padding:6px 8px}
+.wrap{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;min-height:0}
+.stage{position:relative;width:min(96vw,calc(100vh - 44px),900px);aspect-ratio:1/1;background:#000;border:4px solid #6a3b1d;box-shadow:0 8px 28px #0009;overflow:hidden;touch-action:none;flex:0 1 auto}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;background:#000}
+.hud{position:absolute;inset:0;pointer-events:none;z-index:3;font-weight:900;font-size:clamp(12px,1.25vw,17px);text-shadow:2px 2px 0 #000}
+.hud .box{position:absolute;background:#1d130de8;border:2px solid #f0b54a;border-radius:11px;padding:4px 6px;width:132px;text-align:center;white-space:nowrap}
+#fuel{top:10px;left:10px}
+#lawn{top:10px;left:148px}
+.overlay{position:absolute;inset:0;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+.card{width:min(560px,92%);background:#24160f;border:3px solid #f0b54a;border-radius:18px;padding:22px;text-align:center;box-shadow:0 5px 0 #8b4a1b}
+.card h1{font-size:clamp(34px,6vw,60px);line-height:1;margin:0 0 14px}
+.card p{font-size:clamp(16px,2vw,22px);line-height:1.35;margin:10px 0}
+.card button{margin-top:12px;border:0;border-radius:12px;background:#f0b54a;color:#24160f;font-weight:900;font-size:21px;padding:14px 30px;box-shadow:0 4px 0 #8b4a1b;cursor:pointer}
+.card button:active{transform:translateY(2px);box-shadow:0 2px 0 #8b4a1b}
+.controls{display:none;gap:8px;user-select:none;-webkit-user-select:none;touch-action:none}
+.controls button{width:64px;height:64px;border:0;border-radius:12px;background:#f0b54a;color:#24160f;font-size:29px;font-weight:900;box-shadow:0 3px 0 #8b4a1b;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad{display:grid;grid-template-columns:64px 64px 64px;grid-template-rows:64px 64px;gap:7px}
+.pad .u{grid-column:2}.pad .l{grid-column:1;grid-row:2}.pad .d{grid-column:2;grid-row:2}.pad .r{grid-column:3;grid-row:2}
+.help{font-size:13px;line-height:1.1;color:#ead9c9;text-align:center;max-width:900px;flex:0 0 auto}
+@media (pointer:coarse){.controls{display:flex}.stage{width:min(96vw,calc(100vh - 170px),760px)}.help{display:none}}
+@media (max-width:620px){body{padding-top:6px}.hud{font-size:11px}.hud .box{width:112px;padding:4px 5px}#fuel{top:7px;left:7px}#lawn{top:7px;left:124px}.card{padding:18px}.help{font-size:13px}.controls button{width:58px;height:58px}.pad{grid-template-columns:58px 58px 58px;grid-template-rows:58px 58px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <canvas id="game" width="1254" height="1254"></canvas>
+    <div class="hud"><div class="box" id="fuel">FUEL 100%</div><div class="box" id="lawn">LAWN 0%</div></div>
+    <div class="overlay" id="overlay">
+      <div class="card">
+        <h1>Hurry up Pop Pop!</h1>
+        <p>Mow the lawn so Pop Pop can play with Miles.</p>
+        <p>Finish the yard before you run out of gas. Stop on the shed ramp to refuel.</p>
+        <p><b>Drive:</b> arrow keys or W/A/S/D.</p>
+        <button id="play">PLAY</button>
+      </div>
+    </div>
+  </div>
+  <div class="controls" aria-label="Driving controls">
+    <div class="pad">
+      <button class="u" data-key="ArrowUp" aria-label="Drive up">▲</button>
+      <button class="l" data-key="ArrowLeft" aria-label="Drive left">◀</button>
+      <button class="d" data-key="ArrowDown" aria-label="Drive down">▼</button>
+      <button class="r" data-key="ArrowRight" aria-label="Drive right">▶</button>
+    </div>
+  </div>
+  <div class="help">Drive with arrow keys or WASD. Stop on the shed ramp to refuel.</div>
+</div>
+<script>
+const ASSETS={"yard_unmowed": "assets/yard_unmowed.png", "yard_complete": "assets/yard_complete.png", "grass_mask": "assets/grass_mask.png", "miles_up": "assets/miles_up.png", "miles_down": "assets/miles_down.png", "miles_left": "assets/miles_left.png", "miles_right": "assets/miles_right.png", "gas_can": "assets/gas_can.png", "bunny": "assets/bunny.png", "squirrel": "assets/squirrel.png"};
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d'); ctx.imageSmoothingEnabled=false;
+const W=1254,H=1254;
+const overlay=document.getElementById('overlay');
+const fuelEl=document.getElementById('fuel'), lawnEl=document.getElementById('lawn');
+const keys=new Set(); const imgs={};
+for(const [k,v] of Object.entries(ASSETS)){const im=new Image(); im.src=v; imgs[k]=im;}
+
+const yardPoly=[[138,178],[692,178],[692,28],[1125,28],[1125,1092],[138,1092]];
+const house={x:544,y:585,w:502,h:335};
+const deck={x:675,y:492,w:285,h:129};
+const shed={x:963,y:19,w:181,h:127};
+const patio={x:511,y:320,r:73};
+const trees=[{x:455,y:495,r:58},{x:460,y:875,r:65},{x:640,y:320,r:28}];
+const refuel={x:995,y:145,w:120,h:115};
+const milesDeck={x:697,y:512,w:225,h:88};
+
+function pointInPoly(x,y,p){let inside=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const xi=p[i][0],yi=p[i][1],xj=p[j][0],yj=p[j][1];if(((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi+1e-9)+xi))inside=!inside;}return inside;}
+function inRect(x,y,r,pad=0){return x>r.x-pad&&x<r.x+r.w+pad&&y>r.y-pad&&y<r.y+r.h+pad}
+function dist(a,b,c,d){return Math.hypot(a-c,b-d)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rnd(a,b){return a+Math.random()*(b-a)}
+function pick(a){return a[(Math.random()*a.length)|0]}
+function segDist(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;if(!L2)return Math.hypot(px-ax,py-ay);let t=((px-ax)*dx+(py-ay)*dy)/L2;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
+function blocked(x,y,pad=24){
+  if(!pointInPoly(x,y,yardPoly))return true;
+  // forgiving collision for a seven-year-old: fence is solid, but margins are small
+  for(let i=0,j=yardPoly.length-1;i<yardPoly.length;j=i++){
+    if(segDist(x,y,yardPoly[j][0],yardPoly[j][1],yardPoly[i][0],yardPoly[i][1])<8)return true;
+  }
+  if(inRect(x,y,house,14))return true;
+  if(inRect(x,y,deck,12))return true;
+  if(inRect(x,y,shed,10))return true;
+  for(const t of trees) if(dist(x,y,t.x,t.y)<t.r+8) return true;
+  return false;
+}
+
+function milesOk(x,y){
+  const area={x:706,y:518,w:208,h:78};
+  if(!inRect(x,y,area,0))return false;
+  // keep Miles off the umbrella/table set
+  if(dist(x,y,826,536)<34)return false;
+  if(inRect(x,y,{x:792,y:515,w:70,h:58},0))return false;
+  return true;
+}
+function pickMilesTarget(){
+  for(let i=0;i<50;i++){
+    const tx=rnd(710,910), ty=rnd(520,590);
+    if(milesOk(tx,ty)) return {x:tx,y:ty};
+  }
+  return {x:740,y:560};
+}
+function hazardBlocked(x,y,r=14){
+  if(!pointInPoly(x,y,yardPoly))return true;
+  for(let i=0,j=yardPoly.length-1;i<yardPoly.length;j=i++) if(segDist(x,y,yardPoly[j][0],yardPoly[j][1],yardPoly[i][0],yardPoly[i][1])<8) return true;
+  if(inRect(x,y,house,12)||inRect(x,y,deck,12)||inRect(x,y,shed,8)) return true;
+  for(const t of trees) if(dist(x,y,t.x,t.y)<t.r+6) return true;
+  return false;
+}
+
+let game=null,raf=0,last=0;
+
+function newMowLayer(){
+  const layer=document.createElement('canvas'); layer.width=W; layer.height=H; const lctx=layer.getContext('2d');
+  const source=document.createElement('canvas'); source.width=W; source.height=H; const sctx=source.getContext('2d');
+  sctx.drawImage(imgs.yard_complete,0,0,W,H);
+  sctx.globalCompositeOperation='destination-in';
+  sctx.drawImage(imgs.grass_mask,0,0,W,H);
+  sctx.globalCompositeOperation='source-over';
+
+  const maskCanvas=document.createElement('canvas'); maskCanvas.width=W; maskCanvas.height=H; const mctx=maskCanvas.getContext('2d');
+  mctx.drawImage(imgs.grass_mask,0,0,W,H);
+  const gw=125,gh=125,cw=W/gw,ch=H/gh,valid=new Uint8Array(gw*gh),cut=new Uint8Array(gw*gh); let total=0,done=0;
+  const src=mctx.getImageData(0,0,W,H).data;
+  for(let gy=0;gy<gh;gy++)for(let gx=0;gx<gw;gx++){
+    const x=Math.min(W-1,Math.floor((gx+.5)*cw)), y=Math.min(H-1,Math.floor((gy+.5)*ch));
+    if(src[(y*W+x)*4]>40){valid[gy*gw+gx]=1;total++;}
+  }
+  function mow(x,y,r){
+    lctx.save(); lctx.beginPath(); lctx.arc(x,y,r,0,Math.PI*2); lctx.clip(); lctx.drawImage(source,0,0); lctx.restore();
+    const x0=Math.max(0,Math.floor((x-r)/cw)),x1=Math.min(gw-1,Math.ceil((x+r)/cw));
+    const y0=Math.max(0,Math.floor((y-r)/ch)),y1=Math.min(gh-1,Math.ceil((y+r)/ch));
+    for(let gy=y0;gy<=y1;gy++)for(let gx=x0;gx<=x1;gx++){
+      const i=gy*gw+gx;if(!valid[i]||cut[i])continue; const cx=(gx+.5)*cw,cy=(gy+.5)*ch;
+      if(Math.hypot(cx-x,cy-y)<=r){cut[i]=1;done++;}
+    }
+  }
+  return {layer,mow,pct:()=>Math.round(done/Math.max(1,total)*100)};
+}
+
+function start(){
+  game={state:'play',m:{x:905,y:250,a:0,s:0,fuel:100,stall:0},mow:newMowLayer(),miles:{x:748,y:558,dir:'down',tx:748,ty:558,t:0,bubble:{text:'Hurry up!',t:2.2}},hazards:[],hazT:6.5,chatT:5};
+  overlay.style.display='none';fuelEl.textContent='FUEL 100%';lawnEl.textContent='LAWN 0%';last=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
+}
+function finish(win){game.state=win?'win':'lose';overlay.style.display='flex';overlay.querySelector('.card').innerHTML=`<h1>${win?'All done!':'Out of gas!'}</h1><p>${win?'Pop Pop finished the lawn. Time to play with Miles!':'The mower ran dry before the lawn was finished.'}</p><p><b>Lawn:</b> ${game.mow.pct()}% &nbsp; <b>Fuel:</b> ${Math.round(game.m.fuel)}%</p><button id="again">PLAY AGAIN</button>`;document.getElementById('again').addEventListener('click',start);}
+function say(t,d=2.1){game.miles.bubble={text:t,t:d};}
+function spawnHazard(kind){
+  const routes=kind==='squirrel' ? [[[190,380],[620,420]],[[950,410],[670,530]],[[220,760],[520,700]]] : [[[210,850],[550,820]],[[940,330],[660,580]],[[920,760],[640,720]]];
+  const [a,b]=pick(routes),dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy),sp=kind==='squirrel'?145:112;
+  game.hazards.push({kind,x:a[0],y:a[1],vx:dx/L*sp,vy:dy/L*sp,tx:b[0],ty:b[1],r:24});
+  say(kind==='squirrel'?'Watch out for the squirrel!':'Look out, a bunny!',2.4);
+}
+function update(dt){
+  if(!game||game.state!=='play')return;const m=game.m;
+  // Miles wanders only on the walkable part of the deck
+  const ml=game.miles;
+  ml.t-=dt;
+  if(ml.t<=0 || !milesOk(ml.tx,ml.ty)){
+    ml.t=rnd(1.1,2.4);
+    const p=pickMilesTarget(); ml.tx=p.x; ml.ty=p.y;
+  }
+  const dx=ml.tx-ml.x,dy=ml.ty-ml.y,L=Math.hypot(dx,dy);
+  if(L>2){
+    const nx=ml.x+dx/L*28*dt, ny=ml.y+dy/L*28*dt;
+    if(milesOk(nx,ny)){ ml.x=nx; ml.y=ny; }
+    else { const p=pickMilesTarget(); ml.tx=p.x; ml.ty=p.y; }
+    ml.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?'left':'right'):(dy<0?'up':'down');
+  }
+  if(ml.bubble&&ml.bubble.t>0)ml.bubble.t-=dt;
+  game.chatT-=dt;if(game.chatT<=0){say(m.fuel<25?"Don't run out of gas pop pop!":pick(['Hurry up!','I want to play!']));game.chatT=rnd(5.5,9);}
+  game.hazT-=dt;if(game.hazT<=0){spawnHazard(Math.random()<.5?'squirrel':'bunny');game.hazT=rnd(5.5,9);}
+
+  const f=keys.has('ArrowUp')||keys.has('w')||keys.has('W'),b=keys.has('ArrowDown')||keys.has('s')||keys.has('S'),l=keys.has('ArrowLeft')||keys.has('a')||keys.has('A'),r=keys.has('ArrowRight')||keys.has('d')||keys.has('D');
+  if(m.stall>0){m.stall-=dt;m.s*=.82;}else{
+    // Kid-friendly directional driving: each arrow drives Pop Pop in that screen direction.
+    // No separate steering + gas combination is required.
+    let vx=(r?1:0)-(l?1:0), vy=(b?1:0)-(f?1:0);
+    const inputLen=Math.hypot(vx,vy);
+    const acc=680,drag=760,maxF=245;
+    if(inputLen>0){
+      vx/=inputLen; vy/=inputLen;
+      m.s=Math.min(maxF,m.s+acc*dt);
+      const targetA=Math.atan2(vx,-vy);
+      let da=((targetA-m.a+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;
+      const maxTurn=8.5*dt;
+      m.a+=Math.max(-maxTurn,Math.min(maxTurn,da));
+      const step=m.s*dt;
+      const nx=m.x+vx*step, ny=m.y+vy*step;
+      // Slide along obstacles rather than getting completely stuck on a corner.
+      if(!blocked(nx,ny,33)){m.x=nx;m.y=ny;}
+      else{
+        let moved=false;
+        if(!blocked(nx,m.y,33)){m.x=nx;moved=true;}
+        if(!blocked(m.x,ny,33)){m.y=ny;moved=true;}
+        if(!moved)m.s=Math.max(0,m.s-drag*dt);
+      }
+    }else{
+      m.s=Math.max(0,m.s-drag*dt);
+    }
+  }
+  if(Math.abs(m.s)>3)m.fuel-=2.15*Math.abs(m.s)/230*dt;
+  if(inRect(m.x,m.y,refuel,0)){m.fuel=Math.min(100,m.fuel+70*dt); if(game.miles.bubble&&game.miles.bubble.t<=0) say('Getting gas!',1.0);}
+  if(m.fuel<=0){m.fuel=0;finish(false);return;}
+
+  // cutting deck footprint
+  if(m.s>8 && !blocked(m.x,m.y,18))game.mow.mow(m.x,m.y+5,42);
+
+  for(const h of game.hazards){const nx=h.x+h.vx*dt, ny=h.y+h.vy*dt; if(hazardBlocked(nx,ny,20)){h.dead=true; continue;} h.x=nx; h.y=ny; if(dist(h.x,h.y,m.x,m.y)<h.r+34){m.stall=.65;m.fuel=Math.max(0,m.fuel-4);h.dead=true;}}
+  game.hazards=game.hazards.filter(h=>!h.dead&&dist(h.x,h.y,h.tx,h.ty)>16);
+
+  const pct=game.mow.pct();fuelEl.textContent='FUEL '+Math.round(m.fuel)+'%';lawnEl.textContent='LAWN '+pct+'%';if(pct>=95)finish(true);
+}
+
+function drawMower(x,y,a){
+  ctx.save();ctx.translate(x,y);ctx.rotate(a);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(0,8,37,52,0,0,Math.PI*2);ctx.fill();
+  // wheels
+  ctx.fillStyle='#17191d';ctx.fillRect(-39,-30,12,28);ctx.fillRect(27,-30,12,28);ctx.fillRect(-39,18,12,30);ctx.fillRect(27,18,12,30);
+  // cutting deck
+  ctx.fillStyle='#34373d';ctx.beginPath();ctx.roundRect(-38,4,76,36,13);ctx.fill();ctx.strokeStyle='#17191d';ctx.lineWidth=4;ctx.stroke();
+  // mower body / hood
+  ctx.fillStyle='#4b4f55';ctx.beginPath();ctx.roundRect(-27,-45,54,52,10);ctx.fill();ctx.strokeStyle='#202328';ctx.lineWidth=4;ctx.stroke();
+  ctx.fillStyle='#61666e';ctx.fillRect(-20,-34,40,10);
+  // seat
+  ctx.fillStyle='#16181c';ctx.beginPath();ctx.roundRect(-23,3,46,28,8);ctx.fill();
+  // Pop Pop torso
+  ctx.fillStyle='#254f7c';ctx.beginPath();ctx.ellipse(0,3,22,25,0,0,Math.PI*2);ctx.fill();
+  // arms
+  ctx.strokeStyle='#f0ae7e';ctx.lineWidth=8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-15,-4);ctx.lineTo(-22,-15);ctx.moveTo(15,-4);ctx.lineTo(22,-15);ctx.stroke();
+  // steering wheel
+  ctx.strokeStyle='#0e1013';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,-16,15,0,Math.PI*2);ctx.stroke();
+  // head
+  ctx.fillStyle='#e8aa7b';ctx.beginPath();ctx.arc(0,2,15,0,Math.PI*2);ctx.fill();
+  // dark salt-and-pepper hair, simple cap of hair from overhead
+  ctx.fillStyle='#3c3936';ctx.beginPath();ctx.arc(0,-2,15,Math.PI,0);ctx.lineTo(15,2);ctx.quadraticCurveTo(0,-5,-15,2);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#77716b';ctx.fillRect(-7,-13,5,3);ctx.fillRect(5,-10,4,3);ctx.fillRect(-1,-7,3,3);
+  // beard matching hair
+  ctx.fillStyle='#3c3936';ctx.beginPath();ctx.arc(0,8,11,0,Math.PI);ctx.lineTo(-11,7);ctx.quadraticCurveTo(0,19,11,7);ctx.closePath();ctx.fill();
+  // rear light
+  ctx.fillStyle='#c83b31';ctx.fillRect(-17,34,10,5);ctx.fillRect(7,34,10,5);
+  ctx.restore();
+}
+function drawSpeech(){const b=game.miles.bubble;if(!b||b.t<=0)return;ctx.font='bold 24px system-ui';const tw=ctx.measureText(b.text).width+24,bw=Math.min(340,tw),bh=42;const bx=clamp(game.miles.x-bw/2,15,W-bw-15),by=game.miles.y-88;ctx.fillStyle='white';ctx.strokeStyle='#222';ctx.lineWidth=4;ctx.beginPath();ctx.roundRect(bx,by,bw,bh,10);ctx.fill();ctx.stroke();ctx.fillStyle='#111';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.text,bx+bw/2,by+bh/2);}
+function draw(){
+  ctx.clearRect(0,0,W,H);ctx.drawImage(imgs.yard_unmowed,0,0,W,H);if(!game)return;ctx.drawImage(game.mow.layer,0,0);
+  if(game.m.fuel<99){ctx.save();ctx.strokeStyle='rgba(255,210,70,.95)';ctx.lineWidth=5;ctx.setLineDash([12,8]);ctx.strokeRect(refuel.x,refuel.y,refuel.w,refuel.h);ctx.setLineDash([]);ctx.fillStyle='rgba(30,20,10,.85)';ctx.font='bold 22px system-ui';ctx.textAlign='center';ctx.fillText('GAS',refuel.x+refuel.w/2,refuel.y+refuel.h+26);ctx.restore();}
+
+  // gas can on shed ramp
+  ctx.drawImage(imgs.gas_can,1028,157,52,48);
+  // Miles
+  const mi=imgs['miles_'+game.miles.dir]||imgs.miles_down;ctx.drawImage(mi,game.miles.x-21,game.miles.y-28,42,56);drawSpeech();
+  // animals
+  for(const h of game.hazards){const im=imgs[h.kind];ctx.drawImage(im,h.x-24,h.y-24,48,48);}
+  drawMower(game.m.x,game.m.y,game.m.a);
+}
+function loop(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;update(dt);draw();if(game&&game.state==='play')raf=requestAnimationFrame(loop);}
+
+document.getElementById('play').addEventListener('click',start);
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)){e.preventDefault();keys.add(e.key);}});
+window.addEventListener('keyup',e=>keys.delete(e.key));
+for(const b of document.querySelectorAll('.controls button')){const k=b.dataset.key;const on=e=>{e.preventDefault();keys.add(k)},off=e=>{e.preventDefault();keys.delete(k)};b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off);b.addEventListener('contextmenu',e=>e.preventDefault());}
+</script>
+</body></html>
